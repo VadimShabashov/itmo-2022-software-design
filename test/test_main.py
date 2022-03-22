@@ -1,4 +1,4 @@
-from src.bash.main import Bash
+from src.main import Bash
 
 
 def test_main():

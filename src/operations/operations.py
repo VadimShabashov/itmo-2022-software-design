@@ -1,6 +1,7 @@
 from pathlib import Path, PurePath
 import subprocess
 import sys
+import re
 
 
 class Operation:
@@ -129,11 +130,20 @@ class OperationGetter:
         if name in OperationGetter.operations_dict:
             return OperationGetter.operations_dict[name].execute(*args, prev_output=prev_output)
         else:
-            try:
-                # Пробуем запустить процесс в терминале
-                process = subprocess.run([f"x-terminal-emulator -e {name}", *args], shell=True)
-                output = process.stdout
-                status = process.stderr or ""
-                return output, status
-            except FileNotFoundError:
-                return "", f"{name}: command not found"
+            # Пробуем запустить процесс в терминале.
+            # Для запуска годятся лишь процессы, от которых не ловим output (vim, nano, ...).
+            # Если это делать (например, с помощью записи во временный файл, который создаем в питоне, с помощью команды
+            # command | tee temp_file), то мы поймаем output, но не понятно, когда его надо выводить. И это самая
+            # большая проблема, т.к. после запуска vim есть в output почти все служебная информация.
+            # Нельзя просто так всегда брать и печатать все; надо проверять, но не понятно, как. Поэтому решил, что
+            # самым разумным будет не ловить output вообще, ведь именно не консольные процессы (типа vim) нас
+            # и интересуют.
+            process = subprocess.run([f"{name}", *args], shell=True, stderr=subprocess.PIPE)
+            status = process.stderr.decode('utf-8') or ""
+
+            pattern = re.compile(f".+? {name}: not found\n")
+            if pattern.match(status):
+                print(f"Command \"{name}\" wasn't found")
+            elif status:
+                print("Error while running command in external terminal:\n" + status)
+            return "", ""

@@ -1,6 +1,6 @@
 import sys
 from src.parser.parser import Parser
-import src.operations.operations
+from src.operations.operations import OperationGetter
 
 
 class Bash:
@@ -12,7 +12,7 @@ class Bash:
         self.input_stream = input_stream
         self.output_stream = output_stream
         self.parser = Parser()
-        self.operation_getter = src.operations.operations.OperationGetter
+        self.operation_getter = OperationGetter
 
     def make_assignment(self, expression):
         """

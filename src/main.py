@@ -1,4 +1,3 @@
-import sys
 from src.parser.parser import Parser
 from src.operations.operations import OperationGetter
 
@@ -100,7 +99,7 @@ class Bash:
 
         else:
             while True:
-                input_string = sys.stdin.readline()
+                input_string = input(">>> ")
                 output, status = self.execute_string(input_string)
 
                 if not self.write_output(output, status):

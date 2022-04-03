@@ -25,13 +25,26 @@ class Echo(Operation):
 class Pwd(Operation):
     @staticmethod
     def execute(*args, prev_output):
-        return Path(__file__).resolve().parent.parent.parent, ""
+        return os.getcwd(), ""
 
 
 class Cd(Operation):
     @staticmethod
-    def execute(*args, prev_output):
-        ...
+    def execute(*args, prev_output, current_directory=None):
+        list_args = list(args)
+        if len(list_args) > 1:
+            return "", "ls get only zero or one argument"
+        if len(list_args) == 0:
+            from pathlib import Path
+            os.chdir(str(Path.home()))
+            return "", ""
+        path = list_args[0]
+        try:
+            os.chdir(path)
+            return "", ""
+        except FileNotFoundError:
+            return "", f"cd: {path}: No such file or directory"
+
 
 class Ls(Operation):
     @staticmethod
@@ -272,7 +285,8 @@ class OperationGetter:
                        "wc": Wc,
                        "exit": Exit,
                        "grep": Grep,
-                       "ls": Ls}
+                       "ls": Ls,
+                       "cd": Cd}
 
     def __init__(self):
         pass

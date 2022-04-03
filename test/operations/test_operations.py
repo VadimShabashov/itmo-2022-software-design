@@ -1,6 +1,8 @@
 from src.operations.operations import Echo
 from src.operations.operations import Grep
 from src.operations.operations import Ls
+from src.operations.operations import Cd
+from src.operations.operations import Pwd
 
 
 def test_echo():
@@ -21,6 +23,28 @@ def test_ls():
     res_inner, err = ls.execute(inner_dir, prev_output="never mind")
     assert (set(res_inner.replace("\n", " ").replace("  ", " ").split(" ")), err) ==\
            ({"in3.txt", "in4.txt", "in5.txt"}, "")
+
+
+def test_cd():
+    import os
+    cd = Cd()
+    start_dir = os.getcwd()
+    cur_dir = "./test/operations/test_ls/"
+    prev_cur_dir = "./test/operations/"
+
+    cd.execute(cur_dir, prev_output="never mind")
+    new_dir = os.path.abspath(os.path.basename(cur_dir))
+    assert os.path.abspath(os.getcwd()) == new_dir
+
+    cd.execute("..", prev_output="never mind")
+    new_dir = os.path.abspath(os.path.basename(prev_cur_dir))
+    assert os.path.abspath(os.getcwd()) == new_dir
+
+    cd.execute(".", prev_output="never mind")
+    new_dir = os.path.abspath(os.path.basename(prev_cur_dir))
+    assert os.path.abspath(os.getcwd()) == new_dir
+
+    cd.execute(start_dir, prev_output="never mind")
 
 
 def test_grep(monkeypatch):

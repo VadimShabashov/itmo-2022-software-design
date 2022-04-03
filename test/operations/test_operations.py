@@ -1,11 +1,26 @@
 from src.operations.operations import Echo
 from src.operations.operations import Grep
+from src.operations.operations import Ls
 
 
 def test_echo():
     echo = Echo()
     assert echo.execute("Hello world!", "Hello!", prev_output="Goodbye world!") == ("Hello world! Hello!", "")
     assert echo.execute(prev_output="Only prev_output") == ("", "")
+
+
+def test_ls():
+    ls = Ls()
+    out_dir = "./test/operations/test_ls"
+    inner_dir = "./test/operations/test_ls/inner_dir"
+
+    res_out, err = ls.execute(out_dir, prev_output="never mind")
+    assert (set(res_out.replace("\n", " ").replace("  ", " ").split(" ")), err) ==\
+           ({"inner_dir", "in1.txt", "in2.txt"}, "")
+
+    res_inner, err = ls.execute(inner_dir, prev_output="never mind")
+    assert (set(res_inner.replace("\n", " ").replace("  ", " ").split(" ")), err) ==\
+           ({"in3.txt", "in4.txt", "in5.txt"}, "")
 
 
 def test_grep(monkeypatch):

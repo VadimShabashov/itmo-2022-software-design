@@ -2,6 +2,7 @@ from pathlib import Path, PurePath
 import subprocess
 import sys
 import re
+import os
 
 
 class Operation:
@@ -24,7 +25,74 @@ class Echo(Operation):
 class Pwd(Operation):
     @staticmethod
     def execute(*args, prev_output):
-        return Path(__file__).resolve().parent.parent.parent, ""
+        return os.getcwd(), ""
+
+
+class Cd(Operation):
+    @staticmethod
+    def execute(*args, prev_output, current_directory=None):
+        list_args = list(args)
+        if len(list_args) > 1:
+            return "", "ls get only zero or one argument"
+        if len(list_args) == 0:
+            from pathlib import Path
+            os.chdir(str(Path.home()))
+            return "", ""
+        path = list_args[0]
+        try:
+            os.chdir(path)
+            return "", ""
+        except FileNotFoundError:
+            return "", f"cd: {path}: No such file or directory"
+
+
+class Ls(Operation):
+    @staticmethod
+    def _ls_impl(path):
+        import os
+        from tabulate import tabulate
+        import shutil
+
+        if os.path.isdir(path):
+            dir_list = os.listdir(path)
+            terminal_size, _ = shutil.get_terminal_size()
+
+            max_column = 1
+            num_files = len(dir_list)
+            for column_count in range(2, num_files + 1):
+                max_len_column = 0
+                for j in range(0, num_files, column_count):
+                    max_len_column = max(max_len_column, len(" ".join(dir_list[j: j + column_count])))
+                if max_len_column > terminal_size:
+                    break
+                else:
+                    max_column = column_count
+
+            total_table = []
+            for i in range(0, num_files, max_column):
+                total_table.append(dir_list[i: i + max_column])
+
+            return tabulate(total_table, tablefmt="plain")
+        elif os.path.isfile(path):
+            return path
+        else:
+            raise FileNotFoundError()
+
+
+    @staticmethod
+    def execute(*args, prev_output):
+        list_args = list(args)
+        if args and len(list_args) > 1:
+            return "", "ls get only zero or one argument"
+        path = ""
+        if args is None or len(list_args) == 0:
+            path = "."
+        else:
+            path = list_args[0]
+        try:
+            return Ls._ls_impl(path), ""
+        except FileNotFoundError:
+            return "", f"ls: {path}: No such file or directory"
 
 
 class Cat(Operation):
@@ -216,7 +284,9 @@ class OperationGetter:
                        "cat": Cat,
                        "wc": Wc,
                        "exit": Exit,
-                       "grep": Grep}
+                       "grep": Grep,
+                       "ls": Ls,
+                       "cd": Cd}
 
     def __init__(self):
         pass

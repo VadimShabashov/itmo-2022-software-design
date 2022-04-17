@@ -60,7 +60,7 @@ class Parser:
         # 0, когда может можно, но еще не получили; -1, когда точно нельзя; 1, когда точно можно
         assignment_word = 0
 
-        for char in input_string.rstrip():
+        for char in input_string:
             # Проверка, что каждое слово - присваивание
             if (assignment_word != 1) and (char in "$\'\"| "):
                 assignment_word = -1

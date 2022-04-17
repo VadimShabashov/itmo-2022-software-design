@@ -1,4 +1,3 @@
-import sys
 from src.parser.parser import Parser
 from src.operations.operations import OperationGetter
 
@@ -34,6 +33,7 @@ class Bash:
             for expr in parsed_string[0]:
                 self.make_assignment(expr)
         else:
+            is_cd_none_effect = len(parsed_string) > 1
             for pipeline in parsed_string:
                 if pipeline:
                     operator = pipeline[0]
@@ -43,7 +43,15 @@ class Bash:
                     # status = "" при отсутствии ошибки,
                     # status = "exit" при выполнении команды exit,
                     # status = "описание ошибки" при ошибке.
-                    output, status = self.operation_getter.execute_operation(*args, name=operator, prev_output=output)
+                    if operator == "cd" and is_cd_none_effect:
+                        # no such effect
+                        current_directory, status = self.operation_getter.execute_operation(*args, name="pwd",
+                                                                                 prev_output="")
+                        output, status = self.operation_getter.execute_operation(*args, name="cd",
+                                                                                 prev_output=output)
+                        self.operation_getter.execute_operation(current_directory, name="cd", prev_output=output)
+                    else:
+                        output, status = self.operation_getter.execute_operation(*args, name=operator, prev_output=output)
 
                     if status:
                         if (status == "exit") and (len(parsed_string) > 1):
@@ -100,7 +108,7 @@ class Bash:
 
         else:
             while True:
-                input_string = sys.stdin.readline()
+                input_string = input(">>> ")
                 output, status = self.execute_string(input_string)
 
                 if not self.write_output(output, status):

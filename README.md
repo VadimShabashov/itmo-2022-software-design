@@ -55,6 +55,22 @@ $x
 Bash is terminated. Good day, sir/madame!
 ```
 
+## Requirements
+
+Python 3 is used in the project.
+
+Other requirements specified in the `requirements.txt`.
+
+
 ## Test execution
 
 Execute `pytest` from project root directory.
+
+
+## Architecture scheme
+
+Class `Bash` accepts input string and sends it to the `Parser`.
+`Parser` splits it into pipes, where each pipe consists of command and its arguments.
+The pipeline is returned to `Bash`, which executes it using `OperationExecutor`.
+
+![image info](./scheme/Diagram.png)

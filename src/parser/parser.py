@@ -49,6 +49,23 @@ class Parser:
         else:
             return [[word for pipeline in parsed_string for (word, _) in pipeline]], assignment_status
 
+    def apply_assignments(self, parsed_string):
+        """
+        Применяем присваивания, если выполнен предикат check_assignments
+        """
+        processed_string, assignment_status = self.check_assignments(parsed_string)
+
+        if assignment_status:
+            for expression in processed_string[0]:
+                # Т.к. первый знак равенства отвечает за присваивание
+                var_name, var_value = expression.split("=", maxsplit=1)
+                self.variables[var_name] = var_value
+
+            return [[]]  # Т.к. выполнили все присваивания, а больше команд не осталось
+
+        else:
+            return processed_string
+
     def parse(self, input_string):
         parsed_string = [[]]
         parsed_word = []
@@ -122,4 +139,4 @@ class Parser:
 
         parsed_string[-1].append(("".join(parsed_word), assignment_word == 1))
 
-        return self.check_assignments(parsed_string)
+        return self.apply_assignments(parsed_string)

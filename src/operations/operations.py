@@ -12,38 +12,43 @@ class Operation:
     """
 
     @staticmethod
-    def execute(*args, prev_output):
+    def execute(*args, execution_status):
         pass
 
 
 class Echo(Operation):
     @staticmethod
-    def execute(*args, prev_output):
-        return " ".join(args), ""
+    def execute(*args, execution_status):
+        execution_status.output = " ".join(args)
+        return
 
 
 class Pwd(Operation):
     @staticmethod
-    def execute(*args, prev_output):
-        return os.getcwd(), ""
+    def execute(*args, execution_status):
+        execution_status.output = os.getcwd()
+        return
 
 
 class Cd(Operation):
     @staticmethod
-    def execute(*args, prev_output, current_directory=None):
+    def execute(*args, execution_status, current_directory=None):
         list_args = list(args)
         if len(list_args) > 1:
-            return "", "ls get only zero or one argument"
+            execution_status.add_error("ls get only zero or one argument")
+            return
+
         if len(list_args) == 0:
             from pathlib import Path
             os.chdir(str(Path.home()))
-            return "", ""
+            return
+
         path = list_args[0]
         try:
             os.chdir(path)
-            return "", ""
         except FileNotFoundError:
-            return "", f"cd: {path}: No such file or directory"
+            execution_status.add_error(f"cd: {path}: No such file or directory")
+        return
 
 
 class Ls(Operation):
@@ -78,28 +83,30 @@ class Ls(Operation):
         else:
             raise FileNotFoundError()
 
-
     @staticmethod
-    def execute(*args, prev_output):
+    def execute(*args, execution_status):
         list_args = list(args)
         if args and len(list_args) > 1:
-            return "", "ls get only zero or one argument"
-        path = ""
+            execution_status.add_error("ls get only zero or one argument")
+            return
+
         if args is None or len(list_args) == 0:
             path = "."
         else:
             path = list_args[0]
+
         try:
-            return Ls._ls_impl(path), ""
+            execution_status.provide_output(Ls._ls_impl(path))
         except FileNotFoundError:
-            return "", f"ls: {path}: No such file or directory"
+            execution_status.add_error(f"ls: {path}: No such file or directory")
+        return
 
 
 class Cat(Operation):
     @staticmethod
-    def execute(*args, prev_output):
+    def execute(*args, execution_status):
+        outputs = []
         if args:
-            outputs = []
             for file_name in args:
                 try:
                     with open(file_name, 'r') as file:
@@ -109,26 +116,28 @@ class Cat(Operation):
                         with open(PurePath(Path(__file__).resolve().parent.parent, file_name), 'r') as file:
                             outputs.append(file.read())
                     except FileNotFoundError:
-                        return "", f"cat: {file_name}: No such file or directory"
-            return "\n".join(outputs), ""
+                        execution_status.add_error(f"cat: {file_name}: No such file or directory")
         else:
-            if prev_output:
-                return prev_output, ""
+            if execution_status.prev_output:
+                outputs.append(execution_status.prev_output)
             else:
-                return sys.stdin.read(), ""
+                outputs.append(sys.stdin.read())
+
+        execution_status.output = "\n".join(outputs)
+        return
 
 
 class Wc(Operation):
     @staticmethod
-    def execute(*args, prev_output):
+    def execute(*args, execution_status):
         outputs = []
 
         # Либо читаем из stdin, либо из файлов
         if len(args) == 0:
             statistics = [0, 0, 0]
 
-            if prev_output:
-                text = prev_output
+            if execution_status.prev_output:
+                text = execution_status.prev_output
             else:
                 text = sys.stdin.read()
 
@@ -152,7 +161,7 @@ class Wc(Operation):
                         with open(PurePath(Path(__file__).resolve().parent.parent, file_name), 'r') as file:
                             file_text = file.read()
                     except FileNotFoundError:
-                        return "", f"wc: {file_name}: No such file or directory"
+                        execution_status.add_error(f"wc: {file_name}: No such file or directory")
 
                 for line in file_text.split('\n'):
                     line = line.rstrip()
@@ -170,18 +179,20 @@ class Wc(Operation):
             if len(args) > 1:
                 outputs.append(" ".join(str(s) for s in statistics_total) + " " + "total")
 
-        return "\n".join(outputs), ""
+        execution_status.provide_output("\n".join(outputs))
+        return
 
 
 class Exit(Operation):
     @staticmethod
-    def execute(*args, prev_output):
-        return "", "exit"
+    def execute(*args, execution_status):
+        execution_status.do_exit()
+        return
 
 
 class Grep(Operation):
     @staticmethod
-    def execute(*args, prev_output):
+    def execute(*args, execution_status):
         flag_i = False
         flag_w = False
         flag_A = False
@@ -214,17 +225,17 @@ class Grep(Operation):
                         n = int(args[ind + 1])
                         ind += 1
                     else:
-                        print("Valid int for -A flag wasn't provided")
-                        return "", ""
+                        execution_status.add_error("Valid int for -A flag wasn't provided")
+                        return
             ind += 1
 
         if not word:
-            print("No word pattern for search was provided")
-            return "", ""
+            execution_status.add_error("No word pattern for search was provided")
+            return
 
         if not files:
-            print("No files for search were provided")
-            return "", ""
+            execution_status.add_error("No files for search were provided")
+            return
 
         # Составляем регулярное выражение
         if flag_i and flag_w:
@@ -268,13 +279,38 @@ class Grep(Operation):
                             num_strings -= 1
 
             except FileNotFoundError:
-                print(f"Can't open file {file_name}")
-                return "", ""
+                execution_status.add_error(f"Can't open file {file_name}")
+                return
 
-        return "\n".join(result), ""
+        execution_status.provide_output("\n".join(result))
+        return
 
 
-class OperationGetter:
+class ExternalCommand(Operation):
+    @staticmethod
+    def execute(*args, execution_status):
+        command_name = args[0]
+        command_args = args[1:]
+        # Пробуем запустить процесс в терминале.
+        # Для запуска годятся лишь процессы, от которых не ловим output (vim, nano, ...).
+        # Если это делать (например, с помощью записи во временный файл, который создаем в питоне, с помощью команды
+        # command | tee temp_file), то мы поймаем output, но не понятно, когда его надо выводить. И это самая
+        # большая проблема, т.к. после запуска vim есть в output почти все служебная информация.
+        # Нельзя просто так всегда брать и печатать все; надо проверять, но не понятно, как. Поэтому решил, что
+        # самым разумным будет не ловить output вообще, ведь именно не консольные процессы (типа vim) нас
+        # и интересуют.
+        process = subprocess.run([f"{command_name}", *command_args], shell=True, stderr=subprocess.PIPE)
+        status = process.stderr.decode('utf-8') or ""
+
+        pattern = re.compile(f".+? {command_name}: not found\n")
+        if pattern.match(status):
+            execution_status.add_error(f"Command \"{command_name}\" wasn't found")
+        elif status:
+            execution_status.add_error("Error while running command in external terminal:\n" + status)
+        return
+
+
+class OperationExecutor:
     """
     Класс отвечает за выполнение переданной в текстовом виде команды.
     """
@@ -292,24 +328,9 @@ class OperationGetter:
         pass
 
     @staticmethod
-    def execute_operation(*args, name, prev_output):
-        if name in OperationGetter.operations_dict:
-            return OperationGetter.operations_dict[name].execute(*args, prev_output=prev_output)
+    def execute_operation(*args, command_name, execution_status):
+        if command_name in OperationExecutor.operations_dict:
+            OperationExecutor.operations_dict[command_name].execute(*args, execution_status=execution_status)
+            return
         else:
-            # Пробуем запустить процесс в терминале.
-            # Для запуска годятся лишь процессы, от которых не ловим output (vim, nano, ...).
-            # Если это делать (например, с помощью записи во временный файл, который создаем в питоне, с помощью команды
-            # command | tee temp_file), то мы поймаем output, но не понятно, когда его надо выводить. И это самая
-            # большая проблема, т.к. после запуска vim есть в output почти все служебная информация.
-            # Нельзя просто так всегда брать и печатать все; надо проверять, но не понятно, как. Поэтому решил, что
-            # самым разумным будет не ловить output вообще, ведь именно не консольные процессы (типа vim) нас
-            # и интересуют.
-            process = subprocess.run([f"{name}", *args], shell=True, stderr=subprocess.PIPE)
-            status = process.stderr.decode('utf-8') or ""
-
-            pattern = re.compile(f".+? {name}: not found\n")
-            if pattern.match(status):
-                print(f"Command \"{name}\" wasn't found")
-            elif status:
-                print("Error while running command in external terminal:\n" + status)
-            return "", ""
+            ExternalCommand.execute(command_name, *args, execution_status=execution_status)

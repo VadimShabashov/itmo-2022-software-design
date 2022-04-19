@@ -1,8 +1,8 @@
-from src.operations.operations import Echo
-from src.operations.operations import Grep
-from src.operations.operations import Ls
-from src.operations.operations import Cd
-from src.operations.operations import Pwd
+from src.operations.operation_executor import Echo
+from src.operations.operation_executor import Grep
+from src.operations.operation_executor import Ls
+from src.operations.operation_executor import Cd
+from src.operations.operation_executor import Pwd
 
 
 def test_echo():

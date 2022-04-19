@@ -1,8 +1,9 @@
-from sys import stdin, stdout
+import sys
 
 from src.parser.parser import Parser
-from src.operations.operations import OperationExecutor
+from src.operations.operation_executor import OperationExecutor
 from src.operations.execution_status.execution_status import ExecutionStatus
+from src.stream.stream import Stream
 
 
 class Bash:
@@ -10,9 +11,8 @@ class Bash:
     Класс реализует функциональность Bash.
     """
 
-    def __init__(self, input_stream=stdin, output_stream=stdout):
-        self.input_stream = input_stream  # Чтение команд может производиться из файла
-        self.output_stream = output_stream
+    def __init__(self, input_stream=sys.stdin):
+        self.stream = Stream(input_stream, sys.stdout)
         self.parser = Parser()
         self.operation_getter = OperationExecutor
 
@@ -22,8 +22,10 @@ class Bash:
         Она может быть пайплайном; поэтому между всеми операциями передается execution_status
         """
 
-        parsed_string = self.parser.parse(input_string)
+        parsed_string, parse_status = self.parser.parse(input_string)
         execution_status = ExecutionStatus()
+        if parse_status:
+            execution_status.add_error(parse_status)
 
         is_cd_none_effect = len(parsed_string) > 1
         for pipe_ind, pipeline in enumerate(parsed_string):
@@ -52,37 +54,23 @@ class Bash:
 
         return execution_status
 
-    def write_output(self, execution_status):
-        """
-        Вывод ошибок и результата в поток
-        """
-
-        for error in execution_status.errors:
-            self.output_stream.write(error)
-
-        if execution_status.output:
-            self.output_stream.write(execution_status.output)
-
     def run(self):
         """
         Реализуем REPL. Он читает из input_stream и передает в пайплайне execution_status.
         В конце выводит результат в output_stream.
         """
 
-        self.output_stream.write("Bash is started. Welcome back, sir/madame!")
+        self.stream.welcome()
 
         while True:
-            if self.input_stream == stdin:
-                self.output_stream.write("\n>>> ")
-
-            input_string = self.input_stream.readline().rstrip()
+            input_string = self.stream.read()
             execution_status = self.execute_string(input_string)
-            self.write_output(execution_status)
+            self.stream.write_execution_status(execution_status)
 
             if execution_status.exit:
                 break
 
-        self.output_stream.write("Bash is terminated. Good day, sir/madame!")
+        self.stream.goodbye()
 
 
 if __name__ == "__main__":

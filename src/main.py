@@ -1,5 +1,9 @@
+import sys
+
 from src.parser.parser import Parser
-from src.operations.operations import OperationGetter
+from src.operations.operation_executor import OperationExecutor
+from src.operations.execution_status.execution_status import ExecutionStatus
+from src.stream.stream import Stream
 
 
 class Bash:
@@ -7,116 +11,68 @@ class Bash:
     Класс реализует функциональность Bash.
     """
 
-    def __init__(self, input_stream=None, output_stream=None):
-        self.input_stream = input_stream
-        self.output_stream = output_stream
+    def __init__(self, input_stream=sys.stdin):
+        self.stream = Stream(input_stream, sys.stdout)
         self.parser = Parser()
-        self.operation_getter = OperationGetter
-
-    def make_assignment(self, expression):
-        """
-        Обеспечиваем функциональность присваивания переменных.
-        """
-        var_name, var_value = expression.split("=", maxsplit=1)  # Т.к. первый знак равенства отвечает за присваивание
-        self.parser.variables[var_name] = var_value
+        self.operation_getter = OperationExecutor
 
     def execute_string(self, input_string):
         """
-        Исполняем строку, которую считали. Она может быть пайплайном; поэтому между всеми операциями передается output.
+        Исполняем строку, которую считали из потока.
+        Она может быть пайплайном; поэтому между всеми операциями передается execution_status
         """
 
-        parsed_string, assignment_status = self.parser.parse(input_string)
-        output = ""
-        status = ""
+        parsed_string, parse_status = self.parser.parse(input_string)
+        execution_status = ExecutionStatus()
+        if parse_status:
+            execution_status.add_error(parse_status)
 
-        if assignment_status:
-            for expr in parsed_string[0]:
-                self.make_assignment(expr)
-        else:
-            is_cd_none_effect = len(parsed_string) > 1
-            for pipeline in parsed_string:
-                if pipeline:
-                    operator = pipeline[0]
-                    args = pipeline[1:]
+        is_cd_none_effect = len(parsed_string) > 1
+        for pipe_ind, pipeline in enumerate(parsed_string):
+            if pipeline:
+                operator = pipeline[0]
+                args = pipeline[1:]
 
-                    # status - отвечает за статус возврата из функции:
-                    # status = "" при отсутствии ошибки,
-                    # status = "exit" при выполнении команды exit,
-                    # status = "описание ошибки" при ошибке.
-                    if operator == "cd" and is_cd_none_effect:
-                        # no such effect
-                        current_directory, status = self.operation_getter.execute_operation(*args, name="pwd",
-                                                                                 prev_output="")
-                        output, status = self.operation_getter.execute_operation(*args, name="cd",
-                                                                                 prev_output=output)
-                        self.operation_getter.execute_operation(current_directory, name="cd", prev_output=output)
-                    else:
-                        output, status = self.operation_getter.execute_operation(*args, name=operator, prev_output=output)
-
-                    if status:
-                        if (status == "exit") and (len(parsed_string) > 1):
-                            status = ""  # Т.к. при команде ... | exit | ... команда exit будет просто проигнорирована
-                        else:
-                            return output, status
-
-        return output, status
-
-    def write_output(self, output, status):
-        """
-        Запись результата может производиться как в stdout, так и в файл. Она производится построчно, поэтому если
-        ошибка произошла в i-ой строке, предыдущие (i-1) строчка будут записаны.
-
-        Функция возвращает bool - надо ли продолжать REPL (true - если да; false - если нет).
-        """
-
-        if status == "":
-            if output:
-                if self.output_stream:
-                    try:
-                        with open(self.output_stream, 'w+') as output_file:
-                            output_file.write(str(output))
-                    except FileNotFoundError:
-                        print(f"File {self.output_stream} wasn't found for output stream")
-                        return
+                if operator == "cd" and is_cd_none_effect:
+                    # no such effect
+                    self.operation_getter.execute_operation(*args, command_name="pwd",
+                                                            execution_status=execution_status)
+                    current_directory = execution_status.output
+                    self.operation_getter.execute_operation(*args, command_name="cd",
+                                                            execution_status=execution_status)
+                    self.operation_getter.execute_operation(current_directory, command_name="cd",
+                                                            execution_status=execution_status)
                 else:
-                    print(output)
+                    self.operation_getter.execute_operation(*args, command_name=operator,
+                                                            execution_status=execution_status)
 
-            return True
-        else:
-            if status != "exit":
-                print(status)
-            return False
+                if pipe_ind != len(parsed_string) - 1:
+                    execution_status.make_prev_output()
+
+                    # Т.к. при команде ... | exit | ... команда exit будет просто проигнорирована
+                    execution_status.undo_exit()
+
+        return execution_status
 
     def run(self):
         """
-        Реализуем REPL. Он читает из input_stream и передает в пайплайне между операциями output.
+        Реализуем REPL. Он читает из input_stream и передает в пайплайне execution_status.
         В конце выводит результат в output_stream.
         """
 
-        # Чтение команд может производиться из файла
-        if self.input_stream:
-            try:
-                with open(self.input_stream, 'r') as input_file:
-                    for input_string in input_file:
-                        output, status = self.execute_string(input_string)
+        self.stream.welcome()
 
-                        if not self.write_output(output, status):
-                            return
-            except FileNotFoundError:
-                print(f"File {self.input_stream} wasn't found for input stream")
-                return
+        while True:
+            input_string = self.stream.read()
+            execution_status = self.execute_string(input_string)
+            self.stream.write_execution_status(execution_status)
 
-        else:
-            while True:
-                input_string = input(">>> ")
-                output, status = self.execute_string(input_string)
+            if execution_status.exit:
+                break
 
-                if not self.write_output(output, status):
-                    return
+        self.stream.goodbye()
 
 
 if __name__ == "__main__":
-    print("Bash is started. Welcome back, sir/madame!")
     bash = Bash()
     bash.run()
-    print("Bash is terminated. Good day, sir/madame!")

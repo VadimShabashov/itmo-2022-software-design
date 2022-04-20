@@ -25,7 +25,7 @@ class Parser:
         Функция проверит, что: либо все команды - присваивания, либо есть хотя бы одно неприсваивание или пайплайн.
         """
         return (len(parsed_string) == 1) and \
-                all(status for pipeline in parsed_string for (_, status) in pipeline)
+            all(status for pipeline in parsed_string for (_, status) in pipeline)
 
     @staticmethod
     def eliminate_assignments(parsed_string):

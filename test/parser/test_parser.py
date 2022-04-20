@@ -66,12 +66,12 @@ class TestParser:
     def test_parser_unclosed_double_quote(self):
         parsed_string, parse_status = self.parser.parse("echo \"x + cats")
         assert parsed_string == [[]]
-        assert parse_status == f"Quote \" wasn't closed"
+        assert parse_status == "Quote \" wasn't closed"
 
     def test_parser_unclosed_single_quote(self):
         parsed_string, parse_status = self.parser.parse("echo \'x + cats")
         assert parsed_string == [[]]
-        assert parse_status == f"Quote \' wasn't closed"
+        assert parse_status == "Quote \' wasn't closed"
 
     def test_parser_empty_pipe(self):
         parsed_string, parse_status = self.parser.parse("echo cats | ")

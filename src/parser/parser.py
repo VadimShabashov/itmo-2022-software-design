@@ -68,7 +68,7 @@ class Parser:
             processed_string = self.eliminate_assignments(parsed_string)
             return processed_string
 
-    def parse(self, input_string):
+    def parse(self, input_string):  # noqa: C901
         parsed_string = [[]]
         parsed_word = []  # Слово, которое парсим в данный момент
         substituted_word = []  # Слово, начавшееся с $, и в котором поэтому будем делать замену

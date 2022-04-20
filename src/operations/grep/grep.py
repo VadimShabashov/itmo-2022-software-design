@@ -5,7 +5,7 @@ from src.operations.operation import Operation
 
 class Grep(Operation):
     @staticmethod
-    def execute(*args, execution_status):
+    def execute(*args, execution_status):  # noqa: C901
         flag_i = False
         flag_w = False
         flag_A = False

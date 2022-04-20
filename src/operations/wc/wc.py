@@ -35,7 +35,7 @@ class Wc(Operation):
                 execution_status.add_error(f"wc: {file_name}: No such file or directory")
                 continue
 
-            for line in file_text.split('\n'):
+            for line in file_text.splitlines():
                 line = line.rstrip()
                 statistics[0] += 1
                 words = line.split()

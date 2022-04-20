@@ -11,7 +11,7 @@ from src.operations.wc.wc import Wc
 
 class OperationExecutor:
     """
-    Класс отвечает за выполнение переданной в текстовом виде команды.
+    Класс отвечает за передачу выполнения текстовой команды конкретному классу.
     """
 
     operations_dict = {"echo": Echo,

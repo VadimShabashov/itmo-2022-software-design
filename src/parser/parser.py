@@ -150,6 +150,6 @@ class Parser:
         if quote != "":
             return [[]], f"Quote {quote} wasn't closed"
         elif (len(parsed_string) > 1) and any(len(pipe) == 0 for pipe in parsed_string):
-            return [[]], f"Empty pipe was provided"
+            return [[]], "Empty pipe was provided"
         else:
             return self.apply_assignments(parsed_string), ""

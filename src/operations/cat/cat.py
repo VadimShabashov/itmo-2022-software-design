@@ -13,7 +13,8 @@ class Cat(Operation):
                 except FileNotFoundError:
                     execution_status.add_error(f"cat: {file_name}: No such file or directory")
 
-            execution_status.provide_output("\n".join(outputs))
+            if outputs:
+                execution_status.provide_output("\n".join(outputs))
 
         else:
             if execution_status.prev_output:
